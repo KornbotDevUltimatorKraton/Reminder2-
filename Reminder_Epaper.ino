@@ -28,38 +28,30 @@ See more at https://blog.squix.org
 /*****************************
    Important: see settings.h to configure your settings!!!
  * ***************************/
+// all lib that need to be include
 #include "settings.h"
 #include <Arduino.h>
 #include <SPI.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
-
-//#include "WeatherStationFonts.h"
-/***
-   Install the following libraries through Arduino Library Manager
-   - Mini Grafx by Daniel Eichhorn
-   - ESP8266 WeatherStation by Daniel Eichhorn
-   - Json Streaming Parser by Daniel Eichhorn
-   - simpleDSTadjust by neptune2
- ***/
-
 #include <JsonListener.h>
 #include <MiniGrafx.h>
 #include <EPD_WaveShare.h>
 
-
+// install fonts
+#include <MiniGrafxFonts.h>
 #include "ArialRounded.h"
 #include "SansSerif.h"
-#include <MiniGrafxFonts.h>
-#include "configportal.h"
 
+// #include "configportal.h" #future
 
 #define MINI_BLACK 0
 #define MINI_WHITE 1
 
 // defines the colors usable in the paletted 16 color frame buffer
-uint16_t palette[] = {ILI9341_BLACK, // 0
+uint16_t palette[] = {
+                      ILI9341_BLACK, // 0
                       ILI9341_WHITE, // 1
                      };
 
@@ -67,16 +59,13 @@ uint16_t palette[] = {ILI9341_BLACK, // 0
 #define SCREEN_WIDTH 296
 #define BITS_PER_PIXEL 1
 
-
 EPD_WaveShare epd(EPD2_9, CS, RST, DC, BUSY);
 MiniGrafx gfx = MiniGrafx(&epd, BITS_PER_PIXEL, palette);
 
-
-// Setup simpleDSTadjust Library rules
 simpleDSTadjust dstAdjusted(StartRule, EndRule);
 
 void updateData();
-void APIlogin();
+void meetingRoomStatus();
 void drawProgress(uint8_t percentage, String text);
 void drawTime();
 void drawButtons();
@@ -85,6 +74,7 @@ long lastDownloadUpdate = millis();
 uint16_t screen = 0;
 long timerPress;
 bool canBtnPress;
+String endPoint = "http://d60419b6.ngrok.io/api/v1/devices/" //change endPoint
 String hwid = "1234";
 const size_t bufferSize = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(8) + 370;
 
@@ -110,6 +100,7 @@ boolean connectWifi() {
   }
   return true;
 }
+#pragma setup
 
 void setup() {
   Serial.begin(115200);
@@ -120,7 +111,6 @@ void setup() {
   gfx.setRotation(1);
   gfx.setFastRefresh(false);
 
-  // load config if it exists. Otherwise use defaults.
   boolean mounted = SPIFFS.begin();
   if (!mounted) {
     SPIFFS.format();
@@ -160,15 +150,16 @@ void setup() {
 void loop() {
 
 }
+#pragma apiCall
 
-void APIlogin() {
-  HTTPClient http;  //Declare an object of class HTTPClient
+void meetingRoomStatus() {
+  HTTPClient http;
 
-  http.begin("http://d60419b6.ngrok.io/api/v1/devices/"+ hwid); //Specify request destination
+  http.begin(endPoint + hwid);
 
-  int httpCode = http.GET(); //Send the request
+  int httpCode = http.GET();
 
-  if (httpCode > 0) { //Check the returning code
+  if (httpCode > 0) {
     DynamicJsonBuffer jsonBuffer(bufferSize);
     JsonObject& root = jsonBuffer.parseObject(http.getString());
     const char* status = root["data"]["status"]
@@ -179,10 +170,9 @@ void APIlogin() {
 
   }else Serial.println("An error ocurred");
 
-  http.end();   //Close connection
+  http.end();
 }
 
-// Update the internet based information and update screen
 void updateData() {
   configTime(UTC_OFFSET * 3600, 0, NTP_SERVERS);
   gfx.setColor(MINI_BLACK);
@@ -206,7 +196,6 @@ void updateData() {
     delay(100);
 }
 
-// draws the clock
 void drawTime() {
   char *dstAbbrev;
   char time_str[30];
@@ -248,7 +237,6 @@ void drawBattery() {
   gfx.fillRect(SCREEN_WIDTH - 20, 2, 16 * percentage / 100, 6);
 }
 
-// converts the dBm to a range between 0 and 100%
 int8_t getWifiQuality() {
   int32_t dbm = WiFi.RSSI();
   if (dbm <= -100) {
