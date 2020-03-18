@@ -22,7 +22,7 @@ See more at https://blog.squix.org
 const char ArialRoundedMTBold_14[] PROGMEM = {
   0x0E, // Width: 14
   0x11, // Height: 17
-  0x20, // First Char: 32 
+  0x20, // First Char: 32
   0xE0, // Numbers of Chars: 224
 
   // Jump Table:

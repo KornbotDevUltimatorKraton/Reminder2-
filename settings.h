@@ -31,17 +31,17 @@ const String CONFIG_SSID = "ESPaperConfig";
 String WIFI_SSID = "VIVEK";
 String WIFI_PASS = "022760491";
 
-const int UPDATE_INTERVAL_SECS = 20 * 60; // Update every 10 minutes
+const int UPDATE_INTERVAL_SECS = 20 * 60; // Update every 20 minutes
 
 /*
- * BUSY---->gpio4 
- * RST---->gpio2 
- * DC---->gpio5 
- * CS---->gpio15 
- * CLK---->gpio14 
+ * BUSY---->gpio4
+ * RST---->gpio2
+ * DC---->gpio5
+ * CS---->gpio15
+ * CLK---->gpio14
  * DIN---->gpio13
- * Buttons : Reset ( RST pins on esp ) , 
- * Flash ( GPIO-0 10K pull up ) 
+ * Buttons : Reset ( RST pins on esp ) ,
+ * Flash ( GPIO-0 10K pull up )
  * User button ( GPIO-12 10K pull up )
  */
  /*
@@ -66,7 +66,7 @@ const int UPDATE_INTERVAL_SECS = 20 * 60; // Update every 10 minutes
 #define USR_BTN 12 // D6
 
 
-   
+
 // Wunderground Settings
 // To check your settings first try them out in your browser:
 // http://api.wunderground.com/api/WUNDERGROUND_API_KEY/conditions/q/WUNDERGROUND_COUNTTRY/WUNDERGROUND_CITY.json
@@ -82,7 +82,7 @@ String WUNDERGRROUND_LANGUAGE = "EN"; // as per https://www.wunderground.com/wea
 String WUNDERGROUND_COUNTRY = "TH";
 String WUNDERGROUND_CITY = "TH";
 
-#define UTC_OFFSET + 1
+#define UTC_OFFSET + 7
 struct dstRule StartRule = {"CEST", Last, Sun, Mar, 2, 3600}; // Central European Summer Time = UTC/GMT +2 hours
 struct dstRule EndRule = {"CET", Last, Sun, Oct, 2, 0};       // Central European Time = UTC/GMT +1 hour
 

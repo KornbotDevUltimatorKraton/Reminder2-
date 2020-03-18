@@ -28,47 +28,30 @@ See more at https://blog.squix.org
 /*****************************
    Important: see settings.h to configure your settings!!!
  * ***************************/
+// all lib that need to be include
 #include "settings.h"
 #include <Arduino.h>
 #include <SPI.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-
-//#include "WeatherStationFonts.h"
-/***
-   Install the following libraries through Arduino Library Manager
-   - Mini Grafx by Daniel Eichhorn
-   - ESP8266 WeatherStation by Daniel Eichhorn
-   - Json Streaming Parser by Daniel Eichhorn
-   - simpleDSTadjust by neptune2
- ***/
-
-//#include <JsonListener.h>
-//#include <WundergroundConditions.h>
-//#include <WundergroundForecast.h>
-//#include <WundergroundAstronomy.h>
-//#include <WundergroundHourly.h>
+#include <ArduinoJson.h>
+#include <JsonListener.h>
 #include <MiniGrafx.h>
 #include <EPD_WaveShare.h>
 
-
-
-//#include "ArialRounded.h"
+// install fonts
 #include <MiniGrafxFonts.h>
-//#include "moonphases.h"
-//#include "weathericons.h"
-#include "configportal.h"
+#include "ArialRounded.h"
+#include "SansSerif.h"
 
-
+// #include "configportal.h" #future
 
 #define MINI_BLACK 0
 #define MINI_WHITE 1
 
-
-#define MAX_FORECASTS 12
-
 // defines the colors usable in the paletted 16 color frame buffer
-uint16_t palette[] = {ILI9341_BLACK, // 0
+uint16_t palette[] = {
+                      ILI9341_BLACK, // 0
                       ILI9341_WHITE, // 1
                      };
 
@@ -76,31 +59,27 @@ uint16_t palette[] = {ILI9341_BLACK, // 0
 #define SCREEN_WIDTH 296
 #define BITS_PER_PIXEL 1
 
-
 EPD_WaveShare epd(EPD2_9, CS, RST, DC, BUSY);
 MiniGrafx gfx = MiniGrafx(&epd, BITS_PER_PIXEL, palette);
 
-
-
-// Setup simpleDSTadjust Library rules
 simpleDSTadjust dstAdjusted(StartRule, EndRule);
 
 void updateData();
-void APIlogin();
+void meetingRoomStatus();
 void drawProgress(uint8_t percentage, String text);
 void drawTime();
 void drawButtons();
 void drawBattery();
 long lastDownloadUpdate = millis();
-String moonAgeImage = "";
 uint16_t screen = 0;
 long timerPress;
 bool canBtnPress;
+String endPoint = "http://d60419b6.ngrok.io/api/v1/devices/" //change endPoint
 String hwid = "1234";
+const size_t bufferSize = JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + JSON_OBJECT_SIZE(5) + JSON_OBJECT_SIZE(8) + 370;
 
 boolean connectWifi() {
-  if (WiFi.status() == WL_CONNECTED) 
-   //APIlogin(); 
+  if (WiFi.status() == WL_CONNECTED)
    return true;
    Serial.print("[");
    Serial.print(WIFI_SSID.c_str());
@@ -121,22 +100,23 @@ boolean connectWifi() {
   }
   return true;
 }
+#pragma setup
 
 void setup() {
   Serial.begin(115200);
   pinMode(USR_BTN, INPUT_PULLUP);
   int btnState = digitalRead(USR_BTN);
-  
+
   gfx.init();
   gfx.setRotation(1);
   gfx.setFastRefresh(false);
-  
-  // load config if it exists. Otherwise use defaults.
+
   boolean mounted = SPIFFS.begin();
   if (!mounted) {
     SPIFFS.format();
     SPIFFS.begin();
   }
+
   //loadConfig();
 
   Serial.println("State: " + String(btnState));
@@ -148,13 +128,10 @@ void setup() {
     if (connected) {
       updateData();
       gfx.fillBuffer(MINI_WHITE);
-      APIlogin(); 
+      APIlogin();
       drawTime();
       drawWifiQuality();
       drawBattery();
-//      drawCurrentWeather();
-  //    drawForecast();
-   //   drawAstronomy();
       drawButtons();
       gfx.commit();
     } else {
@@ -173,40 +150,31 @@ void setup() {
 void loop() {
 
 }
+#pragma apiCall
 
-void MeetingDaymatch(String match)
-{
- gfx.drawString(2, -4, match); // String match input from the APi
-}
-void APIlogin()
-{
+void meetingRoomStatus() {
+  HTTPClient http;
 
-    HTTPClient http;  //Declare an object of class HTTPClient
+  http.begin(endPoint + hwid);
 
-    http.begin("http://d60419b6.ngrok.io/api/v1/devices/"+ hwid); //Specify request destination
+  int httpCode = http.GET();
 
-    int httpCode = http.GET(); //Send the request
+  if (httpCode > 0) {
+    DynamicJsonBuffer jsonBuffer(bufferSize);
+    JsonObject& root = jsonBuffer.parseObject(http.getString());
+    const char* status = root["data"]["status"]
+    gfx.setTextAlignment(TEXT_ALIGN_LEFT);
+    gfx.setFont(SansSerif_plain_32);
+    gfx.setColor(MINI_BLACK);
+    gfx.drawString(2, 25, status);
 
-    if (httpCode > 0) { //Check the returning code
+  }else Serial.println("An error ocurred");
 
-      String match = http.getString();   //Get the request response payload
-      Serial.println(match);
-      gfx.setTextAlignment(TEXT_ALIGN_LEFT);
-      gfx.setFont(ArialMT_Plain_10);
-      gfx.setColor(MINI_BLACK);
-      gfx.drawString(2, 25, match); // String match input from the APi
-      //MeetingDaymatch(match);         //Sending to the matching function 
-
-    }else Serial.println("An error ocurred");
-
-    http.end();   //Close connection
+  http.end();
 }
 
-// Update the internet based information and update screen
 void updateData() {
   configTime(UTC_OFFSET * 3600, 0, NTP_SERVERS);
-  //HTTPStringget();
-  //gfx.fillBuffer(MINI_WHITE);
   gfx.setColor(MINI_BLACK);
   gfx.fillRect(0, SCREEN_HEIGHT - 12, SCREEN_WIDTH, 12);
   gfx.setColor(MINI_WHITE);
@@ -215,14 +183,20 @@ void updateData() {
   gfx.drawString(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 12, "Refreshing data...");
   gfx.commit();
 
-  //gfx.fillBuffer(MINI_BLACK);
-//  gfx.setFont(ArialRoundedMTBold_14);
- 
+  gfx.setFont(ArialRoundedMTBold_14);
+  Serial.println("\nWaiting for time");
+  unsigned timeout = 3000;
+  unsigned start = millis();
+  while (millis() - start < timeout) {
+    time_t now = time(nullptr);
+    if (now > (2016 - 1970) * 365 * 24 * 3600) {
+      return;
+    }
+    Serial.println(".");
+    delay(100);
 }
 
-// draws the clock
 void drawTime() {
-
   char *dstAbbrev;
   char time_str[30];
   time_t now = dstAdjusted.time(&dstAbbrev);
@@ -263,7 +237,6 @@ void drawBattery() {
   gfx.fillRect(SCREEN_WIDTH - 20, 2, 16 * percentage / 100, 6);
 }
 
-// converts the dBm to a range between 0 and 100%
 int8_t getWifiQuality() {
   int32_t dbm = WiFi.RSSI();
   if (dbm <= -100) {
@@ -295,57 +268,12 @@ void drawButtons() {
 
   uint16_t third = SCREEN_WIDTH / 3;
   gfx.setColor(MINI_BLACK);
-  //gfx.fillRect(0, SCREEN_HEIGHT - 12, SCREEN_WIDTH, 12);
   gfx.drawLine(0, SCREEN_HEIGHT - 12, SCREEN_WIDTH, SCREEN_HEIGHT - 12);
   gfx.drawLine(2 * third, SCREEN_HEIGHT - 12, 2 * third, SCREEN_HEIGHT);
   gfx.setTextAlignment(TEXT_ALIGN_CENTER);
   gfx.setFont(ArialMT_Plain_10);
   gfx.drawString(0.5 * third, SCREEN_HEIGHT - 12, FPSTR(TEXT_CONFIG_BUTTON));
   gfx.drawString(2.5 * third, SCREEN_HEIGHT - 12, FPSTR(TEXT_REFRESH_BUTTON));
-}
-
-String getMeteoconIcon(String iconText) {
-  if (iconText == "chanceflurries") return "F";
-  if (iconText == "chancerain") return "Q";
-  if (iconText == "chancesleet") return "W";
-  if (iconText == "chancesnow") return "V";
-  if (iconText == "chancetstorms") return "S";
-  if (iconText == "clear") return "B";
-  if (iconText == "cloudy") return "Y";
-  if (iconText == "flurries") return "F";
-  if (iconText == "fog") return "M";
-  if (iconText == "hazy") return "E";
-  if (iconText == "mostlycloudy") return "Y";
-  if (iconText == "mostlysunny") return "H";
-  if (iconText == "partlycloudy") return "H";
-  if (iconText == "partlysunny") return "J";
-  if (iconText == "sleet") return "W";
-  if (iconText == "rain") return "R";
-  if (iconText == "snow") return "W";
-  if (iconText == "sunny") return "B";
-  if (iconText == "tstorms") return "0";
-
-  if (iconText == "nt_chanceflurries") return "F";
-  if (iconText == "nt_chancerain") return "7";
-  if (iconText == "nt_chancesleet") return "#";
-  if (iconText == "nt_chancesnow") return "#";
-  if (iconText == "nt_chancetstorms") return "&";
-  if (iconText == "nt_clear") return "2";
-  if (iconText == "nt_cloudy") return "Y";
-  if (iconText == "nt_flurries") return "9";
-  if (iconText == "nt_fog") return "M";
-  if (iconText == "nt_hazy") return "E";
-  if (iconText == "nt_mostlycloudy") return "5";
-  if (iconText == "nt_mostlysunny") return "3";
-  if (iconText == "nt_partlycloudy") return "4";
-  if (iconText == "nt_partlysunny") return "4";
-  if (iconText == "nt_sleet") return "9";
-  if (iconText == "nt_rain") return "7";
-  if (iconText == "nt_snow") return "#";
-  if (iconText == "nt_sunny") return "4";
-  if (iconText == "nt_tstorms") return "&";
-
-  return ")";
 }
 
 
